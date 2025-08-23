@@ -1,15 +1,25 @@
+import csv
 import asyncio
-from aiogram import Bot, Dispatcher
-from aiogram.types import Message
+from aiogram import Bot, Dispatcher, types
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def csv_file_open(name_, text):
+    with open(name_, 'a', encoding='utf8') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow([text])
 
 
-
-bot = Bot(token='7963317130:AAEfdEY08QA4CF-2mJO3OPQ3UqQ2iXDzr_8')
+bot = Bot(token=os.getenv("TOKEN")) # инициализация класса бота
 dp = Dispatcher()
 
 @dp.message()
-async def smd_start(message: Message):
+async def echo(message: types.Message):
     await message.answer(message.text)
+    print(message.text)
+    csv_file_open('file.csv', message.text)
      
 async def start1():
     await dp.start_polling(bot)
