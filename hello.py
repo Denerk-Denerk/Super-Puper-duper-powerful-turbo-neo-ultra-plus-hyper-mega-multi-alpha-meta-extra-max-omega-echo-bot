@@ -34,10 +34,17 @@ dp = Dispatcher()
 async def history(message: types.Message, command: CommandObject):
     history = reader_to_csv_file('file.csv')
     length = command.args
+    id_us = message.from_user.id
+    quantity = 10
     if length:
-        await message.answer('\n'.join([create_format(row) for row in history[:int(length)] if row]))
+        await message.answer('\n'.join([create_format(row) for row in history[:int(length)] if row[3] == str(id_us)]))
     else:
-        await message.answer('\n'.join([create_format(row) for row in history[:10] if row]))
+        for row in history:
+            if row[3] != str(id_us):
+                quantity += 1
+                
+        await message.answer('\n'.join([create_format(row) for row in history[:quantity] if row[3] == str(id_us)]))
+
 
 
 
