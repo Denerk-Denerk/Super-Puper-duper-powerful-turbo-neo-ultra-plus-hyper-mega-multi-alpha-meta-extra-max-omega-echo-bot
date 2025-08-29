@@ -31,17 +31,37 @@ async def history(message: types.Message, command: CommandObject):
 
 
 @dp.message(Command('stats'))
-async def stats(message: types.Message):
+async def stats(message: types.Message, command: CommandObject):
     history = reader_to_csv_file('file.csv')
+    length = command.args
     users = {}
     text = []
-    for row in history:
-        if row[0] not in users:
-            users.update({row[0]: 0})
-        users[row[0]] += 1
-    for user in users:
-        text.append(f"{user}: {users[user]}")
-    await message.answer('\n'.join(text))
+    if length:
+        date_all = length.split(' ')
+        date_start = datetime.strptime(' '.join(date_all[:2]), '%Y-%m-%d %H:%M:%S')  
+        date_end = datetime.strptime(' '.join(date_all[2:]), '%Y-%m-%d %H:%M:%S')
+        if date_start >= date_end:
+            await message.answer("Некорректный ввод даты")
+        else:
+            for row in history:
+                date_row = datetime.strptime(row[1], '%Y-%m-%d %H:%M:%S')
+                print(date_row)
+                if date_start <= date_row <= date_end:
+                    if row[0] not in users:
+                        users.update({row[0]: 0})
+                    users[row[0]] += 1
+            for user in users:
+                text.append(f"{user}: {users[user]}")
+            await message.answer('\n'.join(text) if text else "Нет сообщений за этот период")
+            
+    else:
+        for row in history:
+            if row[0] not in users:
+                users.update({row[0]: 0})
+            users[row[0]] += 1
+        for user in users:
+            text.append(f"{user}: {users[user]}")
+        await message.answer('\n'.join(text))
 
 
 @dp.message()
