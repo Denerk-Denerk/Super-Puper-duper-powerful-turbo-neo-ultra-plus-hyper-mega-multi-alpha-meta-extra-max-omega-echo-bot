@@ -1,4 +1,5 @@
 .env
 file.csv
+*.csv 
 nohup.out
 *.pyc
