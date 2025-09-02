@@ -1,12 +1,18 @@
 
 import asyncio
+from collections import defaultdict
 
 from aiogram.filters import Command, CommandObject
 from aiogram import Bot, Dispatcher, types
 from datetime import datetime
 
 import settings
-from utils import reader_to_csv_file, write_to_csv_file, create_format, write_to_csv_stat
+from utils import (
+    date_range_format,
+    filter_msgs_by_user_id,
+    read_csv_file,
+    write_to_csv_file
+)
 
 
 bot = Bot(token=settings.TOKEN, encode='utf-8')
@@ -16,85 +22,51 @@ dp = Dispatcher()
 
 @dp.message(Command('history'))
 async def history(message: types.Message, command: CommandObject):
-    history = reader_to_csv_file('file.csv')
+    history = read_csv_file(fname='history.csv', fields=["date", "user_id", "user_name", "text"])
     length = command.args
     counter = int(length) if length else 10
-    id_us = str(message.from_user.id)
+    user_id = str(message.from_user.id)
     text = []
-    for row in history:
-        if row['user_id'] == id_us:
-            counter -= 1
-            text.append(create_format(row))
-        if counter <= 0:
-            break
-    await message.answer('\n'.join(text))
+
+    user_messages = filter_msgs_by_user_id(history, user_id, counter)
+    text = [row for row in user_messages]
+
+    msg = '\n'.join(text) if text else "No history for you"
+    await message.answer(text=msg)
 
 
 @dp.message(Command('stats'))
 async def stats(message: types.Message, command: CommandObject):
-    history = reader_to_csv_file('file.csv')
-    stats = reader_to_csv_file('stats.csv')
-    length = command.args
-    users = {}
+    history = read_csv_file(fname='history.csv', fields=["date", "user_id", "user_name", "text"])
+    args = command.args
+    users = defaultdict(int)
     text = []
-    if length:
-        date_all = length.split(' ')
-        date_start = datetime.strptime(' '.join(date_all[:2]), '%Y-%m-%d %H:%M:%S')  
-        date_end = datetime.strptime(' '.join(date_all[2:]), '%Y-%m-%d %H:%M:%S')
-        if date_start >= date_end:
-            await message.answer("Некорректный ввод даты")
-        else:
-            for row in history:
-                date_row = datetime.strptime(row[1], '%Y-%m-%d %H:%M:%S')
-                if date_start <= date_row <= date_end:
-                    if row[0] not in users:
-                        users.update({row[0]: 0})
-                    users[row[0]] += 1
-            for user in users:
-                text.append(f"{user}: {users[user]}")
-            await message.answer('\n'.join(text) if text else "Нет сообщений за этот период")
-            
-    else:
-        text = []
-        last_id_user = history[0]['message_id']
-        for user in stats:
-            last_id = user['last_message_id']
-            if last_id_user == last_id:
-                for user in stats:
-                    text.append(f"{user['username']}: {user['stat']}\n")
-                await message.answer(''.join(text))
-        if not text:
-            for row in history:
-                if row['username'] not in users:
-                    users.update({row['username']: 0})
-                users[row['username']] += 1
-            for user in users:
-                text.append(f"{user}: {users[user]}")
-            await message.answer('\n'.join(text))
-            text.clear()
-            for user in users:
-                for row in history:
-                    if row['username'] == user:
-                        text.append([user, str(users[user]), row['message_id']])
-                        break
-                    
-            write_to_csv_stat('stats.csv', text)
-                
-        
+
+    start, end = date_range_format(args)
+    for row in history:
+        date_field = datetime.strptime(row["date"], '%Y-%m-%d %H:%M:%S')
+        if start <= date_field <= end:
+            users[row["user_name"]] += 1
+
+    for user in users:
+        text.append(f"{user}: {users[user]}")
+
+    msg = '\n'.join(text) if text else "Нет сообщений за этот период"
+    await message.answer(msg)
 
 
 @dp.message()
 async def echo(message: types.Message):
     await message.answer(message.text)
-    write_to_csv_file(
-        'file.csv',
-        message.text,
-        message.from_user.first_name,
-        message.from_user.id,
-        datetime.strptime(
-            str(message.date.astimezone()),"%Y-%m-%d %H:%M:%S%z").strftime("%Y-%m-%d %H:%M:%S"),
-        message.message_id
-    )
+    data = {
+        "date": message.date.astimezone().strftime("%Y-%m-%d %H:%M:%S"),
+        "user_id": message.from_user.id,
+        "user_name": message.from_user.first_name,
+        "text": message.text,
+
+    }
+    write_to_csv_file(fname='history.csv', data=data)
+    # UPDATE STATS HERE
 
 
 async def start():
